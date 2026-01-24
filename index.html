@@ -941,33 +941,27 @@
             document.getElementById('errorMessage').style.display = 'none';
         }
 
-        async function finishQuiz() {
+       async function finishQuiz() {
             questionScreen.style.display = 'none';
             loadingScreen.style.display = 'flex';
 
-            const prompt = buildRecipePrompt();
-
             try {
                 const response = await fetch(GENERATE_API, {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json"
-  },
-  body: JSON.stringify({ answers })
-});
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ answers })
+                });
 
-if (!response.ok) {
-  throw new Error(`API returned ${response.status}`);
-}
+                if (!response.ok) {
+                    throw new Error(`API returned ${response.status}`);
+                }
 
-const data = await response.json(); // ✅ REQUIRED
-const recipeText = data.recipes;
-const recipes = parseRecipes(recipeText);
+                const data = await response.json();
+                console.log('Received data:', data);
 
-loadingScreen.style.display = 'none';
-resultsScreen.style.display = 'block';
-displayResults(recipes);
-
+                loadingScreen.style.display = 'none';
+                resultsScreen.style.display = 'block';
+                displayResults(data); // Pass the whole data object
 
             } catch (err) {
                 loadingScreen.style.display = 'none';
@@ -977,173 +971,74 @@ displayResults(recipes);
             }
         }
 
-        function buildRecipePrompt() {
-            const ingredientsList = JSON.parse(answers.q1);
-            const servings = answers.q2;
-            const dietary = answers.q3;
-            const timeAvailable = answers.q4;
-            const suggestExtra = answers.q5;
-
-            let ingredientsText = ingredientsList.map(ing => {
-                if (ing.quantity && ing.unit) {
-                    return `${ing.name} (${ing.quantity} ${ing.unit})`;
-                } else if (ing.quantity) {
-                    return `${ing.name} (${ing.quantity})`;
-                } else {
-                    return ing.name;
-                }
-            }).join(', ');
-
-            return `You are a professional chef helping someone create meals from their available ingredients.
-
-AVAILABLE INGREDIENTS:
-${ingredientsText}
-
-CONSTRAINTS:
-- Cooking for: ${servings} people
-- Dietary needs: ${dietary}
-- Time available: ${timeAvailable} minutes
-- ${suggestExtra === 'yes' ? 'Can suggest 2-3 easy-to-find additional ingredients' : 'Must use ONLY the ingredients provided'}
-
-TASK:
-Create exactly 3 distinct recipe ideas:
-1. TRADITIONAL - A classic, comforting recipe
-2. TRENDY - A modern, Instagram-worthy dish
-3. PRACTICAL - Quick, simple, minimal cleanup
-
-For each recipe, provide in this EXACT format:
-
-RECIPE 1: TRADITIONAL
-Name: [Recipe Name]
-Description: [One sentence describing the dish]
-Prep Time: [X minutes]
-Cook Time: [X minutes]
-Difficulty: [Easy/Medium/Hard]
-Ingredients:
-- [ingredient with amount]
-- [ingredient with amount]
-${suggestExtra === 'yes' ? 'Optional Add-ons:\n- [suggested ingredient]\n- [suggested ingredient]' : ''}
-Instructions:
-1. [Step 1]
-2. [Step 2]
-3. [Step 3]
-
-RECIPE 2: TRENDY
-[Same format]
-
-RECIPE 3: PRACTICAL
-[Same format]
-
-Make the recipes realistic, delicious, and properly portioned for ${servings} people. Be specific with measurements and cooking times.`;
-        }
-
-        function parseRecipes(text) {
-            const recipes = [];
-            const recipeTypes = ['TRADITIONAL', 'TRENDY', 'PRACTICAL'];
-            
-            recipeTypes.forEach((type, index) => {
-                const recipeNum = index + 1;
-                const pattern = new RegExp(`RECIPE ${recipeNum}: ${type}([\\s\\S]*?)(?=RECIPE ${recipeNum + 1}:|$)`, 'i');
-                const match = text.match(pattern);
-                
-                if (match) {
-                    const recipeText = match[1];
-                    const recipe = {
-                        type: type,
-                        name: extractField(recipeText, 'Name'),
-                        description: extractField(recipeText, 'Description'),
-                        prepTime: extractField(recipeText, 'Prep Time'),
-                        cookTime: extractField(recipeText, 'Cook Time'),
-                        difficulty: extractField(recipeText, 'Difficulty'),
-                        ingredients: extractList(recipeText, 'Ingredients', 'Optional Add-ons|Instructions'),
-                        optionalAddons: extractList(recipeText, 'Optional Add-ons', 'Instructions'),
-                        instructions: extractList(recipeText, 'Instructions', 'RECIPE')
-                    };
-                    recipes.push(recipe);
-                }
-            });
-            
-            return recipes;
-        }
-
-        function extractField(text, fieldName) {
-            const pattern = new RegExp(`${fieldName}:\\s*(.+)`, 'i');
-            const match = text.match(pattern);
-            return match ? match[1].trim() : '';
-        }
-
-        function extractList(text, startMarker, endMarker) {
-            const pattern = new RegExp(`${startMarker}:([\\s\\S]*?)(?=${endMarker}|$)`, 'i');
-            const match = text.match(pattern);
-            
-            if (!match) return [];
-            
-            const listText = match[1];
-            const items = listText.split('\n')
-                .map(line => line.trim())
-                .filter(line => line.match(/^[-•\d]/))
-                .map(line => line.replace(/^[-•\d.]+\s*/, '').trim());
-            
-            return items;
-        }
-
         function displayResults(data) {
-    const container = document.getElementById('resultsContainer');
-    container.innerHTML = '';
-    
-    const recipes = data.recipes || [];
-    
-    recipes.forEach((recipe, index) => {
-        const card = document.createElement('div');
-        card.className = 'recipe-card';
-        
-        card.innerHTML = `
-            <div class="recipe-header">
-                <div>
-                    <div class="recipe-number">RECIPE #${index + 1}</div>
-                    <div class="recipe-name">${recipe.name || 'Unnamed Recipe'}</div>
-                    <div class="recipe-type">${recipe.type || 'Unknown Type'}</div>
-                </div>
-            </div>
-            <div class="recipe-details">
-                <div class="detail-row">
-                    <span class="detail-label">Prep Time:</span>
-                    <span>${recipe.prep_time || 'N/A'}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">Cook Time:</span>
-                    <span>${recipe.cook_time || 'N/A'}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">Difficulty:</span>
-                    <span>${recipe.difficulty || 'N/A'}</span>
-                </div>
-                <div class="ingredients-section">
-                    <h4>Ingredients:</h4>
-                    <ul>
-                        ${(recipe.ingredients || []).map(ing => `<li>${ing}</li>`).join('')}
-                    </ul>
-                </div>
-                <div class="instructions-section">
-                    <h4>Instructions:</h4>
-                    <ol>
-                        ${(recipe.instructions || []).map(step => `<li>${step}</li>`).join('')}
-                    </ol>
-                </div>
-                ${recipe.optional_additions && recipe.optional_additions.length > 0 ? `
-                <div class="optional-section">
-                    <h4>Optional Additions:</h4>
-                    <ul>
-                        ${recipe.optional_additions.map(item => `<li>${item}</li>`).join('')}
-                    </ul>
-                </div>
-                ` : ''}
-            </div>
-        `;
-        
-        container.appendChild(card);
-    });
-}
+            const container = document.getElementById('resultsContainer');
+            container.innerHTML = '';
+            
+            const recipes = data.recipes || [];
+            
+            if (recipes.length === 0) {
+                container.innerHTML = '<p style="text-align: center; padding: 40px; color: #666;">No recipes generated. Please try again.</p>';
+                return;
+            }
+            
+            recipes.forEach((recipe, index) => {
+                const card = document.createElement('div');
+                card.className = 'recipe-card';
+                
+                const typeClass = recipe.type ? `type-${recipe.type.toLowerCase()}` : 'type-practical';
+                
+                card.innerHTML = `
+                    <div class="recipe-header">
+                        <div>
+                            <span class="recipe-type ${typeClass}">${recipe.type || 'Recipe'}</span>
+                            <div class="recipe-name">${recipe.name || 'Unnamed Recipe'}</div>
+                        </div>
+                    </div>
+                    
+                    <div class="recipe-details">
+                        <div class="detail-item">
+                            <span class="detail-icon">⏱️</span>
+                            <span>Prep: ${recipe.prep_time || 'N/A'}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-icon">🔥</span>
+                            <span>Cook: ${recipe.cook_time || 'N/A'}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-icon">📊</span>
+                            <span>${recipe.difficulty || 'Medium'}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="ingredients-section">
+                        <div class="section-title">🥘 Ingredients</div>
+                        <ul class="ingredients-list">
+                            ${(recipe.ingredients || []).map(ing => `<li>${ing}</li>`).join('')}
+                        </ul>
+                    </div>
+                    
+                    <div class="instructions-section">
+                        <div class="section-title">👨‍🍳 Instructions</div>
+                        <ol class="instructions-list">
+                            ${(recipe.instructions || []).map(step => `<li>${step}</li>`).join('')}
+                        </ol>
+                    </div>
+                    
+                    ${recipe.optional_additions && recipe.optional_additions.length > 0 ? `
+                    <div class="additional-ingredients">
+                        <h4>💡 Optional Add-ons to Elevate This Dish</h4>
+                        <ul>
+                            ${recipe.optional_additions.map(item => `<li>${item}</li>`).join('')}
+                        </ul>
+                    </div>
+                    ` : ''}
+                `;
+                
+                container.appendChild(card);
+            });
+        }
+
 
         function resetApp() {
             answers = {};
