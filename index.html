@@ -1087,73 +1087,63 @@ Make the recipes realistic, delicious, and properly portioned for ${servings} pe
             return items;
         }
 
-        function displayResults(recipes) {
-            const container = document.getElementById('resultsContainer');
-            container.innerHTML = '';
-            
-            recipes.forEach((recipe, index) => {
-                const card = document.createElement('div');
-                card.className = 'recipe-card';
-                
-                const typeClass = `type-${recipe.type.toLowerCase()}`;
-                
-                let ingredientsHTML = '';
-                if (recipe.ingredients.length > 0) {
-                    ingredientsHTML = `
-                        <div class="ingredients-section">
-                            <div class="section-title">Ingredients:</div>
-                            <ul class="ingredients-list">
-                                ${recipe.ingredients.map(ing => `<li>${ing}</li>`).join('')}
-                            </ul>
-                        </div>
-                    `;
-                }
-                
-                let addonsHTML = '';
-                if (recipe.optionalAddons && recipe.optionalAddons.length > 0) {
-                    addonsHTML = `
-                        <div class="additional-ingredients">
-                            <h4>💡 Optional Add-ons (to make it even better):</h4>
-                            <ul>
-                                ${recipe.optionalAddons.map(addon => `<li>${addon}</li>`).join('')}
-                            </ul>
-                        </div>
-                    `;
-                }
-                
-                let instructionsHTML = '';
-                if (recipe.instructions.length > 0) {
-                    instructionsHTML = `
-                        <div class="instructions-section">
-                            <div class="section-title">Instructions:</div>
-                            <ol class="instructions-list">
-                                ${recipe.instructions.map(step => `<li>${step}</li>`).join('')}
-                            </ol>
-                        </div>
-                    `;
-                }
-                
-                card.innerHTML = `
-                    <div class="recipe-header">
-                        <div>
-                            <span class="recipe-type ${typeClass}">${recipe.type}</span>
-                            <div class="recipe-name">${recipe.name || 'Delicious Recipe'}</div>
-                        </div>
-                    </div>
-                    <div class="recipe-description">${recipe.description || ''}</div>
-                    <div class="recipe-details">
-                        ${recipe.prepTime ? `<div class="detail-item"><span class="detail-icon">⏱️</span> Prep: ${recipe.prepTime}</div>` : ''}
-                        ${recipe.cookTime ? `<div class="detail-item"><span class="detail-icon">🔥</span> Cook: ${recipe.cookTime}</div>` : ''}
-                        ${recipe.difficulty ? `<div class="detail-item"><span class="detail-icon">📊</span> ${recipe.difficulty}</div>` : ''}
-                    </div>
-                    ${ingredientsHTML}
-                    ${addonsHTML}
-                    ${instructionsHTML}
-                `;
-                
-                container.appendChild(card);
-            });
-        }
+        function displayResults(data) {
+    const container = document.getElementById('resultsContainer');
+    container.innerHTML = '';
+    
+    const recipes = data.recipes || [];
+    
+    recipes.forEach((recipe, index) => {
+        const card = document.createElement('div');
+        card.className = 'recipe-card';
+        
+        card.innerHTML = `
+            <div class="recipe-header">
+                <div>
+                    <div class="recipe-number">RECIPE #${index + 1}</div>
+                    <div class="recipe-name">${recipe.name || 'Unnamed Recipe'}</div>
+                    <div class="recipe-type">${recipe.type || 'Unknown Type'}</div>
+                </div>
+            </div>
+            <div class="recipe-details">
+                <div class="detail-row">
+                    <span class="detail-label">Prep Time:</span>
+                    <span>${recipe.prep_time || 'N/A'}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Cook Time:</span>
+                    <span>${recipe.cook_time || 'N/A'}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Difficulty:</span>
+                    <span>${recipe.difficulty || 'N/A'}</span>
+                </div>
+                <div class="ingredients-section">
+                    <h4>Ingredients:</h4>
+                    <ul>
+                        ${(recipe.ingredients || []).map(ing => `<li>${ing}</li>`).join('')}
+                    </ul>
+                </div>
+                <div class="instructions-section">
+                    <h4>Instructions:</h4>
+                    <ol>
+                        ${(recipe.instructions || []).map(step => `<li>${step}</li>`).join('')}
+                    </ol>
+                </div>
+                ${recipe.optional_additions && recipe.optional_additions.length > 0 ? `
+                <div class="optional-section">
+                    <h4>Optional Additions:</h4>
+                    <ul>
+                        ${recipe.optional_additions.map(item => `<li>${item}</li>`).join('')}
+                    </ul>
+                </div>
+                ` : ''}
+            </div>
+        `;
+        
+        container.appendChild(card);
+    });
+}
 
         function resetApp() {
             answers = {};
