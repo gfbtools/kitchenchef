@@ -782,26 +782,42 @@
     </div>
 
     <script>
-        const GENERATE_API = 'kitchenchef.smartselleraico.workers.dev';
+        const GENERATE_API = 'YOUR_BACKEND_API_ENDPOINT_HERE';
 
         const QUESTIONS = [
             {
                 id: 'ingredients',
                 type: 'ingredients',
                 prompt: 'What ingredients do you have?',
-                helper: '📝 Add any ingredients you have available. Don\'t worry if you don\'t have everything - we\'ll suggest recipes that work with what you\'ve got!'
+                helper: '📝 List your main ingredients (chicken, rice, vegetables, etc.)'
+            },
+            {
+                id: 'spices',
+                type: 'ingredients',
+                prompt: 'What spices and seasonings do you have?',
+                helper: '🌶️ List your spices (cumin, garlic powder, oregano, chili powder, etc.)'
+            },
+            {
+                id: 'ingredientMode',
+                type: 'radio',
+                prompt: 'Recipe ingredient requirements:',
+                options: [
+                    { value: 'strict', label: '🔒 STRICT - Only use what I listed' },
+                    { value: 'flexible', label: '✨ FLEXIBLE - Can suggest easy-to-find store items' }
+                ]
             },
             {
                 id: 'cuisine',
                 type: 'select',
                 prompt: 'What cuisine are you in the mood for?',
                 options: [
-                    { value: 'puerto-rican', label: '🇵🇷 Puerto Rican - Bold & Flavorful' },
-                    { value: 'southern', label: '🍗 Southern Soul Food - Comfort Classics' },
-                    { value: 'asian', label: '🥢 Asian Fusion - Fresh & Vibrant' },
-                    { value: 'caribbean', label: '🏝️ Caribbean - Tropical & Spicy' },
-                    { value: 'italian', label: '🇮🇹 Italian - Classic & Hearty' },
-                    { value: 'mexican', label: '🌮 Mexican - Zesty & Rich' },
+                    { value: 'italian', label: '🇮🇹 Italian' },
+                    { value: 'mexican', label: '🌮 Mexican' },
+                    { value: 'asian', label: '🥢 Asian' },
+                    { value: 'southern', label: '🍗 Southern' },
+                    { value: 'puerto-rican', label: '🇵🇷 Puerto Rican' },
+                    { value: 'caribbean', label: '🏝️ Caribbean' },
+                    { value: 'american', label: '🇺🇸 American' },
                     { value: 'surprise', label: '✨ Surprise Me!' }
                 ]
             },
@@ -810,33 +826,10 @@
                 type: 'select',
                 prompt: 'How much time do you have?',
                 options: [
-                    { value: '15', label: '⚡ 15 minutes - Quick & Easy' },
-                    { value: '30', label: '⏰ 30 minutes - Balanced' },
-                    { value: '60', label: '🕐 1 hour - Take Your Time' },
-                    { value: '90+', label: '👨‍🍳 90+ minutes - Slow Cook' }
-                ]
-            },
-            {
-                id: 'difficulty',
-                type: 'radio',
-                prompt: 'What\'s your cooking skill level?',
-                options: [
-                    { value: 'beginner', label: '🌱 Beginner - Simple recipes' },
-                    { value: 'intermediate', label: '🔥 Intermediate - Some experience' },
-                    { value: 'advanced', label: '⭐ Advanced - Complex techniques' }
-                ]
-            },
-            {
-                id: 'dietary',
-                type: 'select',
-                prompt: 'Any dietary preferences?',
-                options: [
-                    { value: 'none', label: 'No restrictions' },
-                    { value: 'vegetarian', label: '🥗 Vegetarian' },
-                    { value: 'vegan', label: '🌱 Vegan' },
-                    { value: 'gluten-free', label: '🌾 Gluten-Free' },
-                    { value: 'low-carb', label: '🥩 Low-Carb' },
-                    { value: 'dairy-free', label: '🥛 Dairy-Free' }
+                    { value: '15', label: '⚡ 15 minutes' },
+                    { value: '30', label: '⏰ 30 minutes' },
+                    { value: '60', label: '🕐 1 hour' },
+                    { value: '90+', label: '👨‍🍳 90+ minutes' }
                 ]
             }
         ];
@@ -1010,14 +1003,30 @@
 
         async function generateRecipesWithAI() {
             try {
-                // Parse user preferences
                 const userIngredients = JSON.parse(answers.ingredients || '[]');
+                const userSpices = JSON.parse(answers.spices || '[]');
+                const ingredientMode = answers.ingredientMode || 'flexible';
                 const cuisine = answers.cuisine || 'surprise';
                 const timeLimit = answers.time || '30';
-                const difficulty = answers.difficulty || 'intermediate';
-                const dietary = answers.dietary || 'none';
 
-                // Call Claude API with web search for recipe verification
+                const ingredientList = userIngredients.map(i => i.name).join(', ');
+                const spiceList = userSpices.map(i => i.name).join(', ');
+
+                let modeInstructions = '';
+                if (ingredientMode === 'strict') {
+                    modeInstructions = `STRICT MODE - CRITICAL RULES:
+- ONLY use these ingredients: ${ingredientList}
+- ONLY use these spices: ${spiceList}
+- DO NOT add ANY other ingredients
+- DO NOT suggest shrimp, sausage, plantains, or specialty items unless listed
+- Make FLAVORFUL recipes with JUST what's listed`;
+                } else {
+                    modeInstructions = `FLEXIBLE MODE:
+- Main ingredients: ${ingredientList}
+- Spices available: ${spiceList}
+- You may suggest 1-2 common store items (oil, butter, stock) if it significantly improves the dish`;
+                }
+
                 const response = await fetch("https://api.anthropic.com/v1/messages", {
                     method: "POST",
                     headers: {
@@ -1025,43 +1034,37 @@
                     },
                     body: JSON.stringify({
                         model: "claude-sonnet-4-20250514",
-                        max_tokens: 4000,
+                        max_tokens: 6000,
                         messages: [
                             {
                                 role: "user",
-                                content: `You are an expert chef creating authentic recipes. The user has these ingredients: ${userIngredients.map(i => i.name).join(', ')}.
+                                content: `You are a creative chef creating DELICIOUS, FLAVORFUL recipes.
 
-User preferences:
-- Cuisine: ${cuisine}
-- Time available: ${timeLimit} minutes
-- Skill level: ${difficulty}
-- Dietary: ${dietary}
+${modeInstructions}
 
-IMPORTANT: Use web search to verify that the recipes you create are authentic and use traditional techniques. Search for real recipes in the chosen cuisine style to ensure authenticity.
+PREFERENCES:
+- Cuisine: ${cuisine} (but create VARIETY - different cuisines per recipe!)
+- Time limit: ${timeLimit} minutes
 
-Create 2 recipes that match these criteria. For each recipe, provide:
-1. Recipe name
-2. Type (the cuisine style)
-3. Prep time
-4. Cook time
-5. Difficulty level
-6. Complete ingredient list (include amounts)
-7. Step-by-step instructions
-8. Optional additions/substitutions
+REQUIREMENTS:
+1. Create 4-6 DIVERSE recipes (different cuisines, different styles)
+2. Each recipe must be UNIQUE and INTERESTING
+3. Use spices to make food FLAVORFUL
+4. NO boring bland recipes
+5. Mix cuisines - don't repeat the same type
+6. Respect the time limit
 
-Return ONLY a valid JSON object in this exact format with NO markdown formatting, preamble, or explanation:
+Return ONLY valid JSON (no markdown, no explanation):
 {
   "recipes": [
     {
-      "name": "Recipe Name",
-      "type": "Puerto-Rican",
-      "prep_time": "15 min",
-      "cook_time": "30 min",
-      "difficulty": "Intermediate",
-      "ingredients": ["ingredient 1", "ingredient 2"],
-      "instructions": ["step 1", "step 2"],
-      "optional_additions": ["option 1", "option 2"],
-      "verified": true
+      "name": "Specific Recipe Name",
+      "type": "Italian|Mexican|Asian|Southern|Caribbean|Puerto-Rican|American",
+      "prep_time": "X min",
+      "cook_time": "Y min",
+      "ingredients": ["ingredient with amount"],
+      "instructions": ["detailed step"],
+      "optional_additions": ["if flexible mode"]
     }
   ]
 }`
@@ -1082,7 +1085,6 @@ Return ONLY a valid JSON object in this exact format with NO markdown formatting
 
                 const data = await response.json();
                 
-                // Extract text from response
                 let recipeText = '';
                 for (const block of data.content) {
                     if (block.type === 'text') {
@@ -1090,7 +1092,6 @@ Return ONLY a valid JSON object in this exact format with NO markdown formatting
                     }
                 }
 
-                // Clean and parse JSON
                 recipeText = recipeText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
                 const recipeData = JSON.parse(recipeText);
 
@@ -1099,336 +1100,9 @@ Return ONLY a valid JSON object in this exact format with NO markdown formatting
 
             } catch (err) {
                 console.error('Recipe generation error:', err);
-                // Fallback to demo recipes if API fails
-                displayDemoRecipes();
+                alert('Failed to generate recipes. Error: ' + err.message + '\n\nCheck console (F12) for details.');
+                show('welcomeScreen');
             }
-        }
-
-        function displayDemoRecipes() {
-            const demoData = {
-                recipes: [
-                    {
-                        name: "Arroz con Gandules (Puerto Rican Rice with Pigeon Peas)",
-                        type: "Puerto-Rican",
-                        prep_time: "15 min",
-                        cook_time: "35 min",
-                        difficulty: "Intermediate",
-                        ingredients: [
-                            "2 cups medium-grain rice",
-                            "1 can (15 oz) pigeon peas (gandules), drained",
-                            "4 oz salt pork or bacon, diced",
-                            "1/4 cup sofrito (tomato, peppers, onion, garlic, cilantro blend)",
-                            "2 tbsp recaito (green cooking base)",
-                            "1 packet sazón with achiote",
-                            "2 1/2 cups chicken broth",
-                            "1/4 cup stuffed Spanish olives with brine",
-                            "2 bay leaves",
-                            "1 tsp dried oregano",
-                            "Salt and pepper to taste"
-                        ],
-                        instructions: [
-                            "In a large caldero or heavy-bottomed pot, cook the diced salt pork over medium heat until crispy, about 5-7 minutes. Remove excess fat, leaving about 2 tablespoons.",
-                            "Add sofrito and recaito to the pot. Sauté for 3-4 minutes until fragrant and slightly caramelized.",
-                            "Stir in the sazón packet, oregano, and mix well to coat the sofrito mixture.",
-                            "Add the rice and stir continuously for 2-3 minutes to toast slightly and coat each grain with the seasoned sofrito.",
-                            "Pour in the chicken broth, add pigeon peas, olives with brine, and bay leaves. Stir once and bring to a boil.",
-                            "Once boiling, reduce heat to low, cover tightly, and cook for 20-25 minutes without lifting the lid.",
-                            "After 20 minutes, check if the rice is tender and liquid is absorbed. If needed, cook 5 more minutes.",
-                            "Remove from heat, let stand covered for 5 minutes, then fluff with a fork. Remove bay leaves before serving."
-                        ],
-                        optional_additions: [
-                            "Add diced ham or chorizo for extra protein",
-                            "Top with sliced avocado and tomatoes",
-                            "Serve with tostones (fried plantains) on the side",
-                            "Add roasted red peppers for color and sweetness"
-                        ],
-                        verified: true
-                    },
-                    {
-                        name: "Mofongo with Garlic Shrimp",
-                        type: "Puerto-Rican",
-                        prep_time: "20 min",
-                        cook_time: "25 min",
-                        difficulty: "Advanced",
-                        ingredients: [
-                            "4 green plantains, peeled and cut into 1-inch pieces",
-                            "Vegetable oil for frying",
-                            "6 cloves garlic, minced (divided)",
-                            "4 oz fried pork cracklings (chicharrón), crushed",
-                            "1/4 cup olive oil",
-                            "1/2 cup chicken broth",
-                            "1 lb large shrimp, peeled and deveined",
-                            "2 tbsp butter",
-                            "1/4 cup white wine",
-                            "Juice of 1 lime",
-                            "Fresh cilantro for garnish",
-                            "Salt and pepper to taste"
-                        ],
-                        instructions: [
-                            "Heat 2 inches of vegetable oil in a deep pan to 350°F. Fry plantain pieces in batches until golden but not fully crispy, about 4-5 minutes. Drain on paper towels.",
-                            "In a mortar (pilón), combine half the minced garlic, crushed chicharrón, and olive oil. Add a few pieces of fried plantain and mash vigorously.",
-                            "Continue adding plantain pieces and mashing, gradually adding chicken broth to achieve a cohesive but thick consistency. Season with salt and pepper.",
-                            "Form the mofongo into balls or mounds using the pilón or a bowl. Set aside and keep warm.",
-                            "In a large skillet, melt butter over medium-high heat. Add remaining garlic and sauté for 30 seconds until fragrant.",
-                            "Add shrimp, season with salt and pepper, and cook for 2 minutes per side until pink and just cooked through.",
-                            "Deglaze the pan with white wine and lime juice. Let reduce for 1-2 minutes until sauce slightly thickens.",
-                            "Place mofongo on plates, top with garlic shrimp and sauce, garnish with fresh cilantro and serve immediately."
-                        ],
-                        optional_additions: [
-                            "Add diced tomatoes to the shrimp sauce",
-                            "Substitute chicken or pork for shrimp",
-                            "Mix in crispy bacon bits into the mofongo",
-                            "Serve with a side of avocado salad"
-                        ],
-                        verified: true
-                    },
-                    {
-                        name: "Southern Fried Chicken with Buttermilk Biscuits",
-                        type: "Southern",
-                        prep_time: "30 min (plus 4 hours marinating)",
-                        cook_time: "25 min",
-                        difficulty: "Intermediate",
-                        ingredients: [
-                            "3 lbs chicken pieces (thighs, drumsticks, breasts)",
-                            "2 cups buttermilk",
-                            "2 tbsp hot sauce (Louisiana-style)",
-                            "2 cups all-purpose flour",
-                            "1 tbsp garlic powder",
-                            "1 tbsp onion powder",
-                            "2 tsp paprika",
-                            "1 tsp cayenne pepper",
-                            "1 tsp black pepper",
-                            "2 tsp salt",
-                            "1 tsp dried thyme",
-                            "Vegetable oil or lard for frying"
-                        ],
-                        instructions: [
-                            "In a large bowl, combine buttermilk and hot sauce. Add chicken pieces, ensuring all are submerged. Cover and refrigerate for 4-24 hours.",
-                            "In a shallow dish, combine flour, garlic powder, onion powder, paprika, cayenne, black pepper, salt, and thyme. Mix thoroughly.",
-                            "Remove chicken from buttermilk, letting excess drip off. Dredge each piece in seasoned flour, pressing firmly to coat all sides. Shake off excess.",
-                            "For extra crispy coating, dip floured chicken back into buttermilk briefly, then coat with flour mixture again (double dredge).",
-                            "Heat 2 inches of oil in a large cast-iron skillet or Dutch oven to 325-350°F. Use a thermometer for accuracy.",
-                            "Carefully add chicken pieces to hot oil without crowding (work in batches). Dark meat takes 13-15 minutes, white meat 10-12 minutes.",
-                            "Flip chicken pieces halfway through cooking. Internal temperature should reach 165°F for white meat, 175°F for dark meat.",
-                            "Drain fried chicken on a wire rack over paper towels. Let rest 5 minutes before serving to allow juices to redistribute."
-                        ],
-                        optional_additions: [
-                            "Serve with honey drizzle for sweet heat",
-                            "Make sawmill gravy with the pan drippings",
-                            "Add collard greens and mac & cheese as sides",
-                            "Sprinkle with fresh herbs like parsley or chives"
-                        ],
-                        verified: true
-                    },
-                    {
-                        name: "Shrimp and Grits with Andouille Sausage",
-                        type: "Southern",
-                        prep_time: "15 min",
-                        cook_time: "30 min",
-                        difficulty: "Intermediate",
-                        ingredients: [
-                            "1 cup stone-ground grits",
-                            "4 cups water",
-                            "1 cup heavy cream",
-                            "4 oz sharp cheddar cheese, grated",
-                            "4 tbsp butter (divided)",
-                            "1 lb large shrimp, peeled and deveined",
-                            "8 oz andouille sausage, sliced",
-                            "1 bell pepper, diced",
-                            "1 small onion, diced",
-                            "2 cloves garlic, minced",
-                            "1/2 cup chicken stock",
-                            "2 tbsp lemon juice",
-                            "2 green onions, sliced",
-                            "Cajun seasoning, salt, and pepper to taste"
-                        ],
-                        instructions: [
-                            "Bring water to a boil in a medium saucepan. Slowly whisk in grits, reduce heat to low, and simmer for 20-25 minutes, stirring frequently.",
-                            "Stir heavy cream into grits and continue cooking until creamy. Remove from heat, add cheese and 2 tablespoons butter. Season with salt and pepper. Keep warm.",
-                            "In a large skillet, cook andouille sausage over medium-high heat until browned and crispy edges form, about 4-5 minutes. Remove and set aside.",
-                            "In the same skillet with sausage drippings, add 2 tablespoons butter, bell pepper, and onion. Sauté for 4-5 minutes until softened.",
-                            "Add garlic and cook for 30 seconds until fragrant. Season shrimp generously with Cajun seasoning.",
-                            "Add seasoned shrimp to the skillet and cook for 2 minutes per side until pink and just cooked through.",
-                            "Return sausage to the pan, add chicken stock and lemon juice. Bring to a simmer and let reduce for 2-3 minutes.",
-                            "Spoon creamy grits into bowls, top with shrimp and sausage mixture, garnish with sliced green onions, and serve immediately."
-                        ],
-                        optional_additions: [
-                            "Add crispy bacon on top for extra richness",
-                            "Drizzle with hot sauce for more heat",
-                            "Mix in roasted tomatoes to the shrimp",
-                            "Add a poached egg on top for brunch"
-                        ],
-                        verified: true
-                    },
-                    {
-                        name: "Honey Garlic Chicken Stir-Fry",
-                        type: "Asian",
-                        prep_time: "15 min",
-                        cook_time: "12 min",
-                        difficulty: "Beginner",
-                        ingredients: [
-                            "1.5 lbs boneless chicken thighs, cut into bite-sized pieces",
-                            "3 tbsp soy sauce",
-                            "2 tbsp honey",
-                            "1 tbsp rice vinegar",
-                            "1 tbsp sesame oil",
-                            "5 cloves garlic, minced",
-                            "1 tbsp fresh ginger, grated",
-                            "2 tbsp vegetable oil",
-                            "1 red bell pepper, sliced",
-                            "1 cup broccoli florets",
-                            "1 cup snap peas",
-                            "2 green onions, sliced",
-                            "1 tbsp cornstarch mixed with 2 tbsp water",
-                            "Sesame seeds for garnish",
-                            "Cooked jasmine rice for serving"
-                        ],
-                        instructions: [
-                            "In a bowl, whisk together soy sauce, honey, rice vinegar, and sesame oil. Set aside half of the sauce for finishing.",
-                            "Marinate chicken pieces in half the sauce for 10-15 minutes while you prep vegetables.",
-                            "Heat a large wok or skillet over high heat. Add 1 tablespoon vegetable oil and swirl to coat.",
-                            "Add chicken (discard marinade) and stir-fry for 5-6 minutes until golden brown and cooked through. Remove and set aside.",
-                            "Add remaining oil to the wok. Stir-fry garlic and ginger for 30 seconds until fragrant.",
-                            "Add bell pepper, broccoli, and snap peas. Stir-fry for 3-4 minutes until vegetables are crisp-tender.",
-                            "Return chicken to the wok, add reserved sauce and cornstarch slurry. Toss everything together and cook for 1-2 minutes until sauce thickens.",
-                            "Remove from heat, garnish with green onions and sesame seeds. Serve immediately over jasmine rice."
-                        ],
-                        optional_additions: [
-                            "Add cashews or peanuts for crunch",
-                            "Include baby corn and water chestnuts",
-                            "Drizzle with chili oil for heat",
-                            "Add a splash of oyster sauce for umami depth"
-                        ],
-                        verified: true
-                    },
-                    {
-                        name: "Vietnamese Pho Ga (Chicken Pho)",
-                        type: "Asian",
-                        prep_time: "20 min",
-                        cook_time: "45 min",
-                        difficulty: "Intermediate",
-                        ingredients: [
-                            "2 lbs bone-in chicken pieces (thighs and drumsticks)",
-                            "8 cups chicken stock",
-                            "2 inches fresh ginger, sliced",
-                            "1 large onion, halved",
-                            "3 star anise",
-                            "2 cinnamon sticks",
-                            "4 whole cloves",
-                            "1 tbsp coriander seeds",
-                            "3 tbsp fish sauce",
-                            "1 tbsp sugar",
-                            "8 oz flat rice noodles (bánh phở)",
-                            "Fresh herbs: cilantro, Thai basil, mint",
-                            "Bean sprouts, lime wedges, jalapeños for serving",
-                            "Hoisin sauce and sriracha on the side"
-                        ],
-                        instructions: [
-                            "Char ginger and onion directly over a gas flame or under the broiler until blackened on all sides, about 3-4 minutes. This adds depth to the broth.",
-                            "In a dry skillet, toast star anise, cinnamon, cloves, and coriander seeds over medium heat for 2 minutes until fragrant.",
-                            "In a large pot, bring chicken stock to a boil. Add chicken pieces, charred ginger and onion, and toasted spices.",
-                            "Reduce heat to low and simmer gently for 30-35 minutes until chicken is fully cooked. Skim any foam that rises to the surface.",
-                            "Remove chicken from broth, let cool slightly, then shred the meat. Discard bones and skin.",
-                            "Strain the broth through a fine-mesh sieve to remove all solids. Return clear broth to pot, add fish sauce and sugar. Taste and adjust seasoning.",
-                            "Cook rice noodles according to package directions (usually 5-7 minutes in boiling water). Drain and rinse with cold water.",
-                            "Divide noodles among bowls, top with shredded chicken. Ladle hot broth over everything. Serve with fresh herbs, bean sprouts, lime, jalapeños, hoisin, and sriracha."
-                        ],
-                        optional_additions: [
-                            "Add sliced rare beef for pho bo ga (beef and chicken)",
-                            "Include fried shallots for garnish",
-                            "Add a soft-boiled egg to each bowl",
-                            "Top with crispy chicken skin for texture"
-                        ],
-                        verified: true
-                    },
-                    {
-                        name: "Jamaican Jerk Chicken with Rice and Peas",
-                        type: "Caribbean",
-                        prep_time: "20 min (plus 2 hours marinating)",
-                        cook_time: "40 min",
-                        difficulty: "Intermediate",
-                        ingredients: [
-                            "3 lbs chicken pieces (legs and thighs work best)",
-                            "6 green onions (scallions)",
-                            "6 cloves garlic",
-                            "3 Scotch bonnet peppers (or habaneros)",
-                            "2 tbsp fresh thyme leaves",
-                            "2 tbsp allspice (pimento) berries, ground",
-                            "1 tbsp ground cinnamon",
-                            "1 tsp ground nutmeg",
-                            "1/4 cup soy sauce",
-                            "1/4 cup vegetable oil",
-                            "3 tbsp brown sugar",
-                            "2 tbsp lime juice",
-                            "1 tbsp fresh ginger, grated",
-                            "2 tsp black pepper",
-                            "Salt to taste"
-                        ],
-                        instructions: [
-                            "Make jerk marinade: In a food processor, combine green onions, garlic, Scotch bonnets (remove seeds for less heat), thyme, allspice, cinnamon, nutmeg, soy sauce, oil, brown sugar, lime juice, ginger, and black pepper. Blend until smooth paste forms.",
-                            "Score chicken pieces with deep cuts to allow marinade penetration. Season with salt, then coat thoroughly with jerk marinade, rubbing it deep into the cuts.",
-                            "Cover and refrigerate for at least 2 hours, preferably overnight for maximum flavor.",
-                            "Preheat grill to medium heat (or oven to 375°F). If grilling, oil grates well to prevent sticking.",
-                            "Grill chicken over indirect heat, skin-side down first, for 15-20 minutes. Flip and cook another 15-20 minutes until internal temperature reaches 165°F.",
-                            "For oven method: Place chicken on a foil-lined baking sheet and roast for 35-40 minutes, flipping halfway through.",
-                            "During the last 5 minutes, move chicken to direct heat (or broil) to char the exterior slightly for authentic jerk flavor.",
-                            "Let chicken rest for 5 minutes before serving with rice and peas."
-                        ],
-                        optional_additions: [
-                            "Serve with fried plantains on the side",
-                            "Add grilled pineapple slices",
-                            "Make a mango salsa topping",
-                            "Drizzle with extra lime juice before serving"
-                        ],
-                        verified: true
-                    },
-                    {
-                        name: "Caribbean Curry Goat (or Chicken)",
-                        type: "Caribbean",
-                        prep_time: "25 min",
-                        cook_time: "1 hour 45 min",
-                        difficulty: "Advanced",
-                        ingredients: [
-                            "2.5 lbs bone-in goat meat (or chicken), cut into 2-inch pieces",
-                            "4 tbsp Caribbean curry powder",
-                            "2 large onions, diced",
-                            "6 cloves garlic, minced",
-                            "2 tbsp fresh ginger, grated",
-                            "3 green onions, chopped",
-                            "2 Scotch bonnet peppers, whole (for flavor, not heat)",
-                            "3 large potatoes, cubed",
-                            "2 cups coconut milk",
-                            "2 cups chicken stock",
-                            "3 sprigs fresh thyme",
-                            "2 tbsp vegetable oil",
-                            "2 tbsp browning sauce (or dark soy sauce)",
-                            "1 tbsp allspice berries",
-                            "Salt and black pepper to taste",
-                            "Fresh cilantro for garnish"
-                        ],
-                        instructions: [
-                            "Season goat meat generously with 2 tablespoons curry powder, salt, and pepper. Let marinate for 30 minutes at room temperature.",
-                            "Heat oil in a large Dutch oven or heavy pot over medium-high heat. Brown meat in batches until deeply caramelized on all sides, about 5-6 minutes per batch. Remove and set aside.",
-                            "In the same pot, add onions and cook for 5 minutes until softened. Add garlic, ginger, and remaining curry powder. Cook for 2 minutes until fragrant.",
-                            "Return browned meat to pot. Add browning sauce and stir to coat everything evenly, creating a deep brown color.",
-                            "Add chicken stock, coconut milk, thyme, allspice berries, and whole Scotch bonnets (don't break them unless you want extreme heat). Bring to a boil.",
-                            "Reduce heat to low, cover, and simmer for 1 hour, stirring occasionally. Goat should become tender but not falling apart.",
-                            "Add cubed potatoes and green onions. Continue simmering uncovered for 30-40 minutes until potatoes are tender and sauce has thickened.",
-                            "Taste and adjust seasoning with salt and pepper. Remove whole peppers and thyme stems. Garnish with fresh cilantro and serve with rice or roti."
-                        ],
-                        optional_additions: [
-                            "Add carrots and bell peppers with the potatoes",
-                            "Serve with Jamaican festival (fried sweet dumplings)",
-                            "Add chickpeas for extra heartiness",
-                            "Top with pickled onions for acidity"
-                        ],
-                        verified: true
-                    }
-                ]
-            };
-
-            show('resultsScreen');
-            displayResults(demoData);
         }
 
         function displayResults(data) {
